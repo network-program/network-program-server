@@ -10,13 +10,9 @@
 #define BUF_SIZE 100
 #define MAX_CLIENT 256
 
-void *handle_client(void *arg);
-void send_msg(char *msg, int len);
-void error_handling(char *msg);
-
 int client_cnt = 0;
 int client_socks[MAX_CLIENT];
-pthread_mutex_t mutx;
+prhread_mutex_t mutx;
 
 int main(int argc, char *argv[]) {
 	
@@ -31,12 +27,12 @@ int main(int argc, char *argv[]) {
 	}	
 
 	pthread_mutex_init(&mutx, NULL);
-	server_sock = socket(AF_INET, SOCK_STREAM, 0);
+	serv_sock = socket(AF_INET, SOCK_STREAM, 0);
 
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_addr.sin_port = htons(atoi(argv[1]));
+	server_addr.sin_port = htos(atoi(argv[1]));
 
 	if (bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1)
 		error_handling("bind error");
@@ -61,15 +57,15 @@ int main(int argc, char *argv[]) {
 }
 
 void *handle_client(void *arg) {
-	int client_sock = *((int*)arg);
+	int client_scok = *((int*)arg);
 	int str_len = 0, i;
 	char msg[BUF_SIZE];
 
-	while((str_len=read(client_sock, msg, sizeof(msg))) != 0) {
+	while((str_len=read(client_socket, msg, sizeof(msg))) != 0) {
 		send_msg(msg, str_len);
 	}
 
-	pthread_mutex_lock(&mutx);
+	pthread_mutex_lock(mutx);
 	for(i = 0; i < client_cnt; i++) {
 		if (client_sock == client_socks[i]) {
 			while(i++ < client_cnt - 1)
@@ -85,18 +81,8 @@ void *handle_client(void *arg) {
 	return NULL;
 }
 
-void send_msg(char *msg, int len) {
-	int i;
-	pthread_mutex_lock(&mutx);
-	for(i = 0; i < client_cnt; i++) {
-		write(client_socks[i], msg, len);
-	}
-
-	pthread_mutex_unlock(&mutx);
-}
 void error_handling(char *msg) {
-	fputs(msg, stderr);
-	fputc('\n', stderr);
+	perror(msg);
 	exit(1);
 }
 

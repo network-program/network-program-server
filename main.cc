@@ -1,4 +1,12 @@
 #include <iostream>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/inet.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <pthread.h>
+
 #define BUFSIZE 1024
 void error_handling(char *message);
 int main(int argc, char **argv){
