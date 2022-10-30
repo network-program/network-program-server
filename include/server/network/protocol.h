@@ -5,6 +5,7 @@
 #ifndef SERVER_NETWORK_PROTOCOL_H_
 #define SERVER_NETWORK_PROTOCOL_H_
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
