@@ -31,12 +31,19 @@ namespace network {
 
 class BasicPacketGenerator {
  public:
-//    |  N  |               | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
+
+// Buffer contains 3 header value: N, S1, S2
+// N: Total bytes of a buffer
+// S1: Current index of a packet at separated packets (1, 2, 3, ...)
+// S2: Total size of a separated packets
+//
+//    |       N       | 4-byte    ^
+//    |       S1      | 4-byte    |
+//    |       S2      | 4-byte    |
+//    | 0f| c7| 0a| 78| Content   |
+//           .                    .
+//           .                    .  Total N bytes
+//    | 23| c3|                   v
 
   class Packet {
    public:
@@ -250,6 +257,6 @@ class BasicHTTPProtocol :
   string_type request_line_;
 };
 
-} // namespace common
+} // namespace network
 
 #endif // SERVER_NETWORK_PROTOCOL_H_
