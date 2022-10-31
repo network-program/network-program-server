@@ -29,6 +29,56 @@
 
 namespace network {
 
+class BasicPacket {
+ public:
+  explicit BasicPacket(size_t buffer_size) : buffer_(buffer_size, '\0') {}
+
+  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+  NETWORK_NODISCARD const T& get(size_t index) const {
+    return *reinterpret_cast<const T*>(buffer_.data() + index);
+  }
+  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+  NETWORK_NODISCARD T& get(size_t index) {
+    return *const_cast<T*>(reinterpret_cast<const T*>(buffer_.data() + index));
+  }
+
+  template<typename T, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
+  NETWORK_NODISCARD T get(size_t index) const {
+    return reinterpret_cast<const T>(buffer_.data() + index);
+  }
+  template<typename T, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
+  NETWORK_NODISCARD T get(size_t index) {
+    return const_cast<T>(reinterpret_cast<const T>(buffer_.data() + index));
+  }
+
+  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+  BasicPacket& operator << (const T& value) {
+    CheckOverflow(sizeof(T));
+    get<T>(write_idx) = value;
+    write_idx += sizeof(T);
+    return *this;
+  }
+
+  BasicPacket& operator << (const std::string& str) {
+    CheckOverflow(str.size());
+    std::memcpy(get<char *>(write_idx), str.data(), str.size());
+    write_idx += str.size();
+    return *this;
+  }
+
+  NETWORK_NODISCARD auto data() const { return buffer_.data(); }
+  NETWORK_NODISCARD auto size() const { return buffer_.size(); }
+  NETWORK_NODISCARD auto used_size() const { return write_idx; }
+
+ private:
+  void CheckOverflow(size_t write_size) const {
+    NETWORK_ASSERT(write_size + write_idx <= buffer_.size(), "Overflow while writing to packet");
+  }
+
+  std::string buffer_;
+  size_t write_idx = 0;
+};
+
 class BasicPacketGenerator {
  public:
 //    |  N  |               | 32-bytes
@@ -38,7 +88,8 @@ class BasicPacketGenerator {
 //    |             | 32-bytes
 //    |             | 32-bytes
 
-  class Packet {
+  class Packet
+    : public BasicPacket {
    public:
     enum {
       packet_size_byte    = sizeof(uint32_t),
@@ -51,48 +102,11 @@ class BasicPacketGenerator {
 
     NETWORK_NODISCARD uint32_t current_sequence() const { return get<uint32_t>(current_sequence_byte); }
     NETWORK_NODISCARD uint32_t total_sequence() const { return get<uint32_t>(total_sequence_offset); }
-    NETWORK_NODISCARD std::string_view buffer() const { return buffer_; }
-    NETWORK_NODISCARD std::string_view content() const { return buffer_.data() + packet_header_byte; }
-    NETWORK_NODISCARD size_t size() const { return buffer_.size(); }
+    NETWORK_NODISCARD std::string_view content() const { return data() + packet_header_byte; }
 
    private:
     friend class BasicPacketGenerator;
-    Packet(size_t buffer_size) : buffer_(buffer_size, '\0') {}
-
-    template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-    NETWORK_NODISCARD const T& get(size_t index) const {
-      return *reinterpret_cast<const T*>(buffer_.data() + index);
-    }
-    template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-    NETWORK_NODISCARD T& get(size_t index) {
-      return *const_cast<T*>(reinterpret_cast<const T*>(buffer_.data() + index));
-    }
-
-    template<typename T, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
-    NETWORK_NODISCARD T get(size_t index) const {
-      return reinterpret_cast<const T>(buffer_.data() + index);
-    }
-    template<typename T, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
-    NETWORK_NODISCARD T get(size_t index) {
-      return const_cast<T>(reinterpret_cast<const T>(buffer_.data() + index));
-    }
-
-    template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-    Packet& operator << (const T& value) {
-      get<T>(write_idx) = value;
-      write_idx += sizeof(T);
-      return *this;
-    }
-
-    Packet& operator << (const std::string& str) {
-      NETWORK_ASSERT(str.size() + write_idx <= buffer_.size(), "Overflow while writing to packet");
-      std::memcpy(get<char *>(write_idx), str.data(), str.size());
-      write_idx += str.size();
-      return *this;
-    }
-
-    std::string buffer_;
-    size_t write_idx = 0;
+    explicit Packet(size_t buffer_size) : BasicPacket(buffer_size) {}
   };
 
   using packet = Packet;
@@ -123,7 +137,7 @@ class BasicPacketGenerator {
     packet << total_packet_num_;
 
 #ifndef NDEBUG
-    NETWORK_ASSERT(packet.write_idx == sizeof(uint32_t) * 3, "Invalid write index");
+    NETWORK_ASSERT(packet.used_size() == sizeof(uint32_t) * 3, "Invalid write index");
 #endif
     packet << data_.substr(write_offset_, packet_data_size);
     write_offset_ += packet_data_size;
@@ -152,8 +166,10 @@ class BasicProtocol {
   using string_type = std::string;
   using key_type = string_type;
   using value_type = string_type;
-//  using header_type = std::unordered_map<key_type, value_type>;
-  using header_type = std::vector<std::pair<key_type, value_type>>;
+
+  // TODO: Hold header in unordered_map and hold it's insertion sequence in a vector
+  using header_type = std::unordered_map<key_type, value_type>;
+  using header_sequence_type = std::vector<header_type::iterator>;
 
   BasicProtocol(string_type key_value_separator, string_type key_separator)
     : key_value_separator_(std::move(key_value_separator)),
@@ -168,14 +184,20 @@ class BasicProtocol {
     >
   >
   add_header(Key&& key, Value&& value) {
-    if (const auto it = std::find(header().begin(), header().end(), header_type::value_type(key, value)); it != header().end()) {
-//    if (const auto it = header().find(key); it != header().end()) {
+//    if (const auto it = std::find(header().begin(), header().end(), header_type::value_type(key, value)); it != header().end()) {
+    if (const auto it = header().find(key); it != header().end()) {
       std::stringstream ss;
       ss << "Key " << it->first << " already exists!"
          << " Existing key will be overwritten\n";
       error(ss.str());
+
+      header_.emplace(std::forward<Key>(key), std::forward<Value>(value));
+      auto prev_it = std::find(header_sequence_.begin(), header_sequence_.end(), it);
+      std::swap(*prev_it, header_sequence_.back());
+    } else {
+      auto p = header_.emplace(std::forward<Key>(key), std::forward<Value>(value));
+      header_sequence_.emplace_back(p.first);
     }
-    header_.emplace_back(std::forward<Key>(key), std::forward<Value>(value));
   }
 
    void set_content(string_type data) {
@@ -196,18 +218,51 @@ class BasicProtocol {
   NETWORK_NODISCARD Generator build() const {
     std::stringstream ss;
 
-    for (const auto& [key, value] : header()) {
+    for (const auto it : header_sequence_) {
+      const auto& [key, value] = *it;
       ss << key << key_value_separator_ << value << key_separator_;
     }
+
     ss << key_separator_;
     ss << content_;
 
     return Generator(ss.str(), packet_size);
   }
 
+  void parse(const string_type& str) {
+    if (!header_.empty())
+      error("Header already exists! Existing values will be overwritten");
+    if (!content_.empty())
+      error("Content already exists! Existing values will be overwritten");
+    clear();
+
+    string_type::size_type pos_begin = 0;
+    string_type::size_type pos_end = 0;
+    while (pos_begin < str.size()) {
+      pos_end = str.find(key_separator_, pos_begin);
+
+      // Content
+      if (pos_begin == pos_end)
+        break;
+
+      // Header
+      const auto sep_pos = str.find(key_value_separator_, pos_begin);
+      std::string key(str.begin() + pos_begin, str.begin() + sep_pos);
+      std::string value(str.begin() + sep_pos + key_value_separator_.size(), str.begin() + pos_end);
+      add_header(std::move(key), std::move(value));
+      pos_begin = pos_end + key_separator_.size();
+    }
+    set_content(str.substr(std::min(pos_end + key_separator_.size(), str.size())));
+  }
+
   void clear() {
     header_.clear();
+    header_sequence_.clear();
     content_.clear();
+  }
+
+  NETWORK_NODISCARD bool empty() const {
+    return header_.empty() && content_.empty();
   }
 
  private:
@@ -216,16 +271,13 @@ class BasicProtocol {
   }
 
   header_type header_;
+  header_sequence_type header_sequence_;
   string_type content_;
   string_type key_value_separator_;
   string_type key_separator_;
 };
 
 using Protocol = BasicProtocol<1'000'000>;
-
-Protocol MakeProtocol() {
-  return {": ", "\r\n"};
-}
 
 template<size_t PacketSize>
 class BasicHTTPProtocol :

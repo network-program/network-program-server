@@ -30,6 +30,32 @@ int main() {
     }
   }
 
+  { // Parse test 1
+    network::Protocol protocol("=>", "\r\n");
+
+    protocol.parse("Header1=>Value1\r\nHeader2=>Value2\r\n\r\nHello This is a content");
+
+    network::Protocol::header_type::iterator it;
+    if (it = protocol.header().find("Header1"); it == protocol.header().end()) return EXIT_FAILURE;
+    if (it->second != "Value1") return EXIT_FAILURE;
+    if (it = protocol.header().find("Header2"); it == protocol.header().end()) return EXIT_FAILURE;
+    if (it->second != "Value2") return EXIT_FAILURE;
+    if (protocol.content() != "Hello This is a content") return EXIT_FAILURE;
+  }
+
+  { // Parse test 2
+    network::Protocol protocol(":", "\r\n");
+
+    protocol.parse("H:V\r\nH2:V2\r\n\r\nHello This is a content\nWith a newline!");
+
+    network::Protocol::header_type::iterator it;
+    if (it = protocol.header().find("H"); it == protocol.header().end()) return EXIT_FAILURE;
+    if (it->second != "V") return EXIT_FAILURE;
+    if (it = protocol.header().find("H2"); it == protocol.header().end()) return EXIT_FAILURE;
+    if (it->second != "V2") return EXIT_FAILURE;
+    if (protocol.content() != "Hello This is a content\nWith a newline!") return EXIT_FAILURE;
+  }
+
   {
     network::BasicProtocol<20> small_packet_protocol(":", ";");
     small_packet_protocol.add_header("header", "value"); // 11 bytes + 2 bytes
