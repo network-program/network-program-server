@@ -24,11 +24,13 @@ int main(int argc, char *argv[]) {
 void *handle_client(void *arg) {
 	int client_sock = *((int*)arg);
 	int str_len = 0, i;
-	char msg[sock.BUF_SIZE];
+	char buf[BUFSIZ];
+  
+  if(read(client_sock, buf, BUFSIZ) < 0) {
+    perror("state code 500");
+  }
 
-	while((str_len=read(client_sock, msg, sizeof(msg))) != 0) {
-		send_msg(msg, str_len);
-	}
+  printf("%s\n",buf); // request message 출력
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
@@ -44,14 +46,4 @@ void *handle_client(void *arg) {
 	close(client_sock);
 	
 	return NULL;
-}
-
-void send_msg(char *msg, int len) {
-	int i;
-	pthread_mutex_lock(&sock.mutx);
-	for(i = 0; i < sock.client_cnt; i++) {
-		write(sock.client_socks[i], msg, len);
-	}
-
-	pthread_mutex_unlock(&sock.mutx);
 }

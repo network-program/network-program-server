@@ -42,14 +42,14 @@ void sock_init(int port_number) {
   pthread_mutex_init(&sock.mutx, NULL);
   sock.server_sock = socket(AF_INET, SOCK_STREAM, 0);
 
-  memset(&sock.server_sock, 0, sizeof(&sock.server_sock));
+  memset(&sock.server_addr, 0, sizeof(&sock.server_addr));
   sock.server_addr.sin_family = AF_INET;
-  sock.server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  sock.server_addr.sin_port = htons(port_number);
+	sock.server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	sock.server_addr.sin_port = htons(port_number);
 
-  printf("%o %d\n",INADDR_ANY, port_number);
+  printf("%s %d\n",inet_ntoa(sock.server_addr.sin_addr), port_number);
 
-  if (bind(sock.server_sock, (struct sockaddr*)&sock.server_addr, sizeof(sock.server_addr)) == -1)
+  if (bind(sock.server_sock, (struct sockaddr*)&(sock.server_addr), sizeof(sock.server_addr)) == -1)
     error_handling("bind error");
   if (listen(sock.server_sock, sock.MAX_CLIENT) == -1)
     error_handling("listen error");
