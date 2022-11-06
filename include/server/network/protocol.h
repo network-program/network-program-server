@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -31,46 +32,32 @@ namespace network {
 
 class BasicPacket {
  public:
+  using string_type = std::string;
+  using pointer = typename string_type::pointer;
+  using const_pointer = typename string_type::const_pointer;
+  using size_type = typename string_type::size_type;
+
   explicit BasicPacket(size_t buffer_size) : buffer_(buffer_size, '\0') {}
 
-  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-  NETWORK_NODISCARD const T& get(size_t index) const {
-    return *reinterpret_cast<const T*>(buffer_.data() + index);
-  }
-  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-  NETWORK_NODISCARD T& get(size_t index) {
-    return *const_cast<T*>(reinterpret_cast<const T*>(buffer_.data() + index));
-  }
+  template<typename T = const_pointer, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
+  NETWORK_NODISCARD T data(size_t index = 0) const { return reinterpret_cast<T>(buffer_.data() + index); }
+  NETWORK_NODISCARD size_type size() const { return buffer_.size(); }
+  NETWORK_NODISCARD size_type used_size() const { return write_idx; }
 
-  template<typename T, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
-  NETWORK_NODISCARD T get(size_t index) const {
-    return reinterpret_cast<const T>(buffer_.data() + index);
-  }
-  template<typename T, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
-  NETWORK_NODISCARD T get(size_t index) {
-    return const_cast<T>(reinterpret_cast<const T>(buffer_.data() + index));
-  }
+  NETWORK_NODISCARD std::string_view string_view() const { return data(); }
+  NETWORK_NODISCARD string_type to_string() const { return data(); }
 
-  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-  BasicPacket& operator << (const T& value) {
-    CheckOverflow(sizeof(T));
-    get<T>(write_idx) = value;
-    write_idx += sizeof(T);
-    return *this;
-  }
-
-  BasicPacket& operator << (const std::string& str) {
+  BasicPacket& operator << (const string_type& str) {
     CheckOverflow(str.size());
-    std::memcpy(get<char *>(write_idx), str.data(), str.size());
+    std::memcpy(data(write_idx), str.data(), str.size());
     write_idx += str.size();
     return *this;
   }
 
-  NETWORK_NODISCARD auto data() const { return buffer_.data(); }
-  NETWORK_NODISCARD auto size() const { return buffer_.size(); }
-  NETWORK_NODISCARD auto used_size() const { return write_idx; }
+ protected:
+  template<typename T = pointer, std::enable_if_t<std::is_pointer_v<T>, int> = 0>
+  NETWORK_NODISCARD T data(size_t index = 0) { return reinterpret_cast<T>(buffer_.data() + index); }
 
- private:
   void CheckOverflow(size_t write_size) const {
     NETWORK_ASSERT(write_size + write_idx <= buffer_.size(), "Overflow while writing to packet");
   }
@@ -79,84 +66,100 @@ class BasicPacket {
   size_t write_idx = 0;
 };
 
-class BasicPacketGenerator {
+class StringPacket : public BasicPacket {
+  template<typename ...>
+  struct always_false : std::false_type {};
+
  public:
-//    |  N  |               | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
-//    |             | 32-bytes
+  using base = BasicPacket;
+  using string_type = base::string_type;
+  using size_type = base::size_type;
+  using base::operator<<;
 
-  class Packet
-    : public BasicPacket {
-   public:
-    enum {
-      packet_size_byte    = sizeof(uint32_t),
-      packet_size_offset  = 0,
-      sequence_byte       = sizeof(uint32_t),
-      current_sequence_byte = packet_size_offset + packet_size_byte,
-      total_sequence_offset = current_sequence_byte + sequence_byte,
-      packet_header_byte    = total_sequence_offset + sequence_byte,
-    };
+  explicit StringPacket(size_t buffer_size) : base(buffer_size) {}
 
-    NETWORK_NODISCARD uint32_t current_sequence() const { return get<uint32_t>(current_sequence_byte); }
-    NETWORK_NODISCARD uint32_t total_sequence() const { return get<uint32_t>(total_sequence_offset); }
-    NETWORK_NODISCARD std::string_view content() const { return data() + packet_header_byte; }
+  template<typename T> NETWORK_NODISCARD T get(size_t index) const;
+  template<> NETWORK_NODISCARD int get<int>(size_t index) const { return std::atoi(base::data(index)); }
+  template<> NETWORK_NODISCARD long get<long>(size_t index) const { return std::atol(base::data(index)); }
+  template<> NETWORK_NODISCARD long long get<long long>(size_t index) const { return std::atoll(base::data(index)); }
 
-   private:
-    friend class BasicPacketGenerator;
-    explicit Packet(size_t buffer_size) : BasicPacket(buffer_size) {}
-  };
+  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+  BasicPacket& operator << (const T& value) {
+    return (*this) << std::to_string(value);
+  }
+};
 
-  using packet = Packet;
-  using string_type = std::string;
+class BinaryPacket : public BasicPacket {
+ public:
+  using base = BasicPacket;
+  using string_type = base::string_type;
+  using size_type = base::size_type;
+  using base::operator<<;
 
-  BasicPacketGenerator(string_type data, uint32_t packet_size)
-    : data_(std::move(data)),
-      max_packet_size_(packet_size),
-      total_packet_num_(data_.empty() ? 0 :
-                        ((data_.size() - 1) / (max_packet_size_ - packet::packet_header_byte)) + 1)
-  {
-    NETWORK_ASSERT(max_packet_size_ > packet::packet_header_byte,
-                   "Packet size must be greater than packet header size");
+  explicit BinaryPacket(size_t buffer_size) : BasicPacket(buffer_size) {}
+
+  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+  NETWORK_NODISCARD T get(size_t index) const {
+    return *base::data<const T*>(index);
   }
 
-  std::optional<packet> GenerateNext() {
-    if (write_offset_ >= data_.size()) {
+  template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+  BasicPacket& operator << (const T& value) {
+    CheckOverflow(sizeof(T));
+    (*base::data<T*>()) = value;
+    write_idx += sizeof(T);
+    return *this;
+  }
+};
+
+template<typename Packet>
+class BasicPacketGenerator {
+ public:
+  using packet = Packet;
+  using string_type = typename packet::string_type;
+
+  BasicPacketGenerator(uint32_t total_packet_num, size_t packet_size, string_type data)
+    : data_(std::move(data)),
+      max_packet_size_(packet_size),
+      total_packet_num_(total_packet_num)
+  {}
+
+  BasicPacketGenerator(uint32_t max_packet_size, string_type data)
+    : total_packet_num_(data.empty() ? 0 : ((data.size() - 1) / max_packet_size) + 1),
+      data_(std::move(data)),
+      max_packet_size_(max_packet_size)
+  {}
+
+  virtual std::optional<packet> GenerateNext() {
+    if (write_offset_ >= data().size()) {
       return {};
     }
 
-    const uint32_t packet_header_size = packet::packet_header_byte;
-    const uint32_t packet_size = std::min(max_packet_size_, static_cast<uint32_t>(data_.size()) + packet_header_size);
-    const uint32_t packet_data_size = packet_size - packet_header_size;
-    Packet packet(packet_size);
+    const uint32_t packet_size = std::min(max_packet_size_, static_cast<uint32_t>(data().size()));
+    packet p(packet_size);
 
-    packet << packet_size;
-    packet << ++generated_packet_index_;
-    packet << total_packet_num_;
+    p << data().substr(write_offset_, packet_size);
+    write_offset_ += packet_size;
 
-#ifndef NDEBUG
-    NETWORK_ASSERT(packet.used_size() == sizeof(uint32_t) * 3, "Invalid write index");
-#endif
-    packet << data_.substr(write_offset_, packet_data_size);
-    write_offset_ += packet_data_size;
-
-    return packet;
+    return p;
   }
 
   NETWORK_NODISCARD auto total_packet_num() const { return total_packet_num_; }
   NETWORK_NODISCARD auto generated_packet_num() const { return generated_packet_index_; }
 
- private:
-  string_type data_;
-  typename string_type::size_type write_offset_ = 0;
-  const uint32_t max_packet_size_;
+ protected:
+  NETWORK_NODISCARD string_type& data() { return data_; }
+  NETWORK_NODISCARD const string_type& data() const { return data_; }
   uint32_t generated_packet_index_ = 0;
   const uint32_t total_packet_num_;
+
+ private:
+  typename string_type::size_type write_offset_ = 0;
+  const uint32_t max_packet_size_;
+  string_type data_;
 };
 
-template<size_t PacketSize>
+template<size_t PacketSize, typename PacketGenerator>
 class BasicProtocol {
  public:
   enum {
@@ -166,8 +169,8 @@ class BasicProtocol {
   using string_type = std::string;
   using key_type = string_type;
   using value_type = string_type;
+  using generator = PacketGenerator;
 
-  // TODO: Hold header in unordered_map and hold it's insertion sequence in a vector
   using header_type = std::unordered_map<key_type, value_type>;
   using header_sequence_type = std::vector<header_type::iterator>;
 
@@ -208,16 +211,12 @@ class BasicProtocol {
      content_ = std::move(data);
    }
 
-  NETWORK_NODISCARD header_type& header() { return header_; }
   NETWORK_NODISCARD const header_type& header() const { return header_; }
 
   NETWORK_NODISCARD string_type& content() { return content_; }
   NETWORK_NODISCARD const string_type& content() const { return content_; }
 
-  template<typename Generator = BasicPacketGenerator>
-  NETWORK_NODISCARD Generator build() const {
-    std::stringstream ss;
-
+  NETWORK_NODISCARD generator build(std::stringstream ss = std::stringstream()) const {
     for (const auto it : header_sequence_) {
       const auto& [key, value] = *it;
       ss << key << key_value_separator_ << value << key_separator_;
@@ -226,10 +225,10 @@ class BasicProtocol {
     ss << key_separator_;
     ss << content_;
 
-    return Generator(ss.str(), packet_size);
+    return generator(packet_size, ss.str());
   }
 
-  void parse(const string_type& str) {
+  virtual void parse(const string_type& str) {
     if (!header_.empty())
       error("Header already exists! Existing values will be overwritten");
     if (!content_.empty())
@@ -265,41 +264,20 @@ class BasicProtocol {
     return header_.empty() && content_.empty();
   }
 
- private:
+  NETWORK_NODISCARD const string_type& key_separator() const { return key_separator_; }
+  NETWORK_NODISCARD const string_type& key_value_separator() const { return key_value_separator_; }
+
+ protected:
   void error(const std::string& message) {
     std::cerr << message;
   }
 
+ private:
   header_type header_;
   header_sequence_type header_sequence_;
   string_type content_;
   string_type key_value_separator_;
   string_type key_separator_;
-};
-
-using Protocol = BasicProtocol<1'000'000>;
-
-template<size_t PacketSize>
-class BasicHTTPProtocol :
-  public BasicProtocol<PacketSize> {
- public:
-  using base = BasicProtocol<PacketSize>;
-  using base::packet_size;
-  using string_type = typename base::string_type;
-
-  BasicHTTPProtocol() : base(": ", "\r\n") {}
-
-  BasicHTTPProtocol& request(string_type request_line) {
-    if (!request_line_.empty()) {
-      base::error("Request line already exists!. Existing request line will be overwritten");
-    }
-    request_line_ = std::move(request_line);
-    return *this;
-  }
-
-
- private:
-  string_type request_line_;
 };
 
 } // namespace common
