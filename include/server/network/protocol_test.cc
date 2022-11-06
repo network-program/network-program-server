@@ -47,7 +47,7 @@ class MockPacketGenerator
   MockPacketGenerator(uint32_t packet_size, string_type data)
     : base(data.empty() ? 0 : ((data.size() - 1) / (packet_size - packet::packet_header_byte)) + 1,
            packet_size,
-           std::move(data)),
+           data),
       max_packet_size_(packet_size)
   {
     NETWORK_ASSERT(max_packet_size_ > packet::packet_header_byte,

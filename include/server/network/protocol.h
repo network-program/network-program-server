@@ -5,6 +5,7 @@
 #ifndef SERVER_NETWORK_PROTOCOL_H_
 #define SERVER_NETWORK_PROTOCOL_H_
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
@@ -79,15 +80,16 @@ class StringPacket : public BasicPacket {
   explicit StringPacket(size_t buffer_size) : base(buffer_size) {}
 
   template<typename T> NETWORK_NODISCARD T get(size_t index) const;
-  template<> NETWORK_NODISCARD int get<int>(size_t index) const { return std::atoi(base::data(index)); }
-  template<> NETWORK_NODISCARD long get<long>(size_t index) const { return std::atol(base::data(index)); }
-  template<> NETWORK_NODISCARD long long get<long long>(size_t index) const { return std::atoll(base::data(index)); }
 
   template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
   BasicPacket& operator << (const T& value) {
     return (*this) << std::to_string(value);
   }
 };
+
+template<> NETWORK_NODISCARD int StringPacket::get<int>(size_t index) const { return std::atoi(base::data(index)); }
+template<> NETWORK_NODISCARD long StringPacket::get<long>(size_t index) const { return std::atol(base::data(index)); }
+template<> NETWORK_NODISCARD long long StringPacket::get<long long>(size_t index) const { return std::atoll(base::data(index)); }
 
 class BinaryPacket : public BasicPacket {
  public:
