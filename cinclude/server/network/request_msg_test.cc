@@ -40,7 +40,6 @@ void *handle_client(void *arg) {
 	network::HTTPProtocol parser;
 	parser.parse(buf);
 
-
 	// parsing 잘 되는지 확인
 	/*
 	printf("http version = %s\n", parser.http_version());
