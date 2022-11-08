@@ -1,10 +1,9 @@
 /*
- * for HTTP protocol communication server
+ * for just TCP chatting communication server
  * Created by Yi BeomSeok
 */
 
 #include "./socket.h"
-#include "./http_protocol.h"
 #include <iostream>
 
 using namespace std;
@@ -31,21 +30,17 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void *handle_client(void *arg) {
-	int client_sock = *((int*)arg);
+void *handle_client(void *client) {
+	int client_sock = *((int*)client);
 	int str_len = 0, i;
 	char buf[BUFSIZ];
   
-	if(read(client_sock, buf, BUFSIZ) < 0) {
-    perror("state code 500");
+  while((str_len = read(client_sock, buf, BUFSIZ)) != 0) {
+    if(str_len == -1)
+      perror("state code 500");
+    
+    send_msg(buf, str_len);
   }
-	printf("%s\n", buf); // TEST
-
-	network::HTTPProtocol parser;
-  cout << "http version = " << parser.http_version() << '\n';
-  cout << "status code = " << parser.status_code() << '\n';
-  cout << "status_test = " << parser.status_text() << '\n';
-
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
@@ -61,4 +56,14 @@ void *handle_client(void *arg) {
 	close(client_sock);
 	
 	return NULL;
+}
+
+void send_msg(char *msg, int len) {
+  int i;
+
+  pthread_mutex_lock(&sock.mutx);
+  for(i = 0; i < sock.client_cnt; i++) {
+    write(sock.client_socks[i], msg, len);
+  }
+  pthread_mutex_unlock(&sock.mutx);
 }
