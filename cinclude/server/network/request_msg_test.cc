@@ -1,4 +1,6 @@
 #include "./socket.h"
+#include "./http_protocol.h"
+#include <iostream>
 
 extern struct stat_socket sock;
 
@@ -27,11 +29,21 @@ void *handle_client(void *arg) {
 	int str_len = 0, i;
 	char buf[BUFSIZ];
   
-  if(read(client_sock, buf, BUFSIZ) < 0) {
+	if(read(client_sock, buf, BUFSIZ) < 0) {
     perror("state code 500");
   }
 
+	network::HTTPProtocol parser;
+	parser.parse(buf);
+
   printf("%s\n",buf); // request message 출력
+
+	// parsing 잘 되는지 확인
+	printf("http version = %s\n", parser.http_version());
+	printf("status code = %s\n", parser.status_code());
+	printf("status_test = %s\n", parser.status_text());
+
+	// printf("content\n%s\n", parser.content());
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
