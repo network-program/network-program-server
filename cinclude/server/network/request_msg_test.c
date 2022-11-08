@@ -8,14 +8,14 @@ void *handle_client(void *arg);
 int main(int argc, char *argv[]) {
   sock_init(atoi(argv[1]));
 	
-  while (1)
-  {
-		sock_accept();
+  while (1){
+	sock_accept();
 		
-    pthread_create(&sock.t_id, NULL, handle_client, (void*)&sock.client_sock);
-		pthread_detach(sock.t_id);
-		printf("Connected client IP: %s \n", inet_ntoa(sock.client_addr.sin_addr));
-	}
+    	pthread_create(&sock.t_id, NULL, handle_client, (void*)&sock.client_sock);
+	pthread_detach(sock.t_id);
+	printf("Connected client IP: %s \n", inet_ntoa(sock.client_addr.sin_addr));
+	
+  }
 	close(sock.server_sock);
 
 	return 0;
