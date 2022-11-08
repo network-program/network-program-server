@@ -32,11 +32,10 @@ void *handle_client(void *arg) {
 	if(read(client_sock, buf, BUFSIZ) < 0) {
     perror("state code 500");
   }
+	printf("%s\n", buf); // TEST
 
 	network::HTTPProtocol parser;
 	parser.parse(buf);
-
-  printf("%s\n",buf); // request message 출력
 
 	// parsing 잘 되는지 확인
 	printf("http version = %s\n", parser.http_version());
