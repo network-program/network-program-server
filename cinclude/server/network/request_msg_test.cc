@@ -1,6 +1,9 @@
 #include "./socket.h"
-#include "./http_protocol.h"
+#include "network-project/network-program-server/include/server/network/http_protocol.h"
+#include "network-project/network-program-server/include/server/network/protocol.h"
 #include <iostream>
+
+using namespace std;
 
 extern struct stat_socket sock;
 
@@ -35,14 +38,10 @@ void *handle_client(void *arg) {
 	printf("%s\n", buf); // TEST
 
 	network::HTTPProtocol parser;
-	parser.parse(buf);
+  cout << "http version = " << parser.http_version() << '\n';
+  cout << "status code = " << parser.status_code() << '\n';
+  cout << "status_test = " << parser.status_text() << '\n';
 
-	// parsing 잘 되는지 확인
-	printf("http version = %s\n", parser.http_version());
-	printf("status code = %s\n", parser.status_code());
-	printf("status_test = %s\n", parser.status_text());
-
-	// printf("content\n%s\n", parser.content());
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
