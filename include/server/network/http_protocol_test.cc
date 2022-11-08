@@ -41,6 +41,19 @@ int main() {
                 "Hello, network!") TEST_FAIL;
   }
 
+  { // Make response
+    network::HTTPProtocol protocol;
+    protocol.response(404, "FORBIDDEN");
+    protocol.add_header("header", "value");
+    protocol.set_content("Access denied");
+    auto generator = protocol.build();
+    auto packet = generator.GenerateNext();
+    if (packet; packet->to_string() != "HTTP/1.1 404 FORBIDDEN\r\n"
+                                       "header: value\r\n"
+                                       "\r\n"
+                                       "Access denied") TEST_FAIL;
+  }
+
   {
     constexpr const char* response =
       "HTTP/1.1 403 FORBIDDEN\r\n"
