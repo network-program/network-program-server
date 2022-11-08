@@ -1,4 +1,9 @@
 #include "./socket.h"
+#include "network-project/network-program-server/include/server/network/http_protocol.h"
+#include "network-project/network-program-server/include/server/network/protocol.h"
+#include <iostream>
+
+using namespace std;
 
 extern struct stat_socket sock;
 
@@ -27,11 +32,16 @@ void *handle_client(void *arg) {
 	int str_len = 0, i;
 	char buf[BUFSIZ];
   
-  if(read(client_sock, buf, BUFSIZ) < 0) {
+	if(read(client_sock, buf, BUFSIZ) < 0) {
     perror("state code 500");
   }
+	printf("%s\n", buf); // TEST
 
-  printf("%s\n",buf); // request message 출력
+	network::HTTPProtocol parser;
+  cout << "http version = " << parser.http_version() << '\n';
+  cout << "status code = " << parser.status_code() << '\n';
+  cout << "status_test = " << parser.status_text() << '\n';
+
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {

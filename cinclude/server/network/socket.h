@@ -57,11 +57,10 @@ void sock_init(int port_number) {
 
 void sock_accept() {
   sock.client_addr_size = sizeof(sock.client_addr);
-  sock.client_sock = accept(sock.server_sock, (struct sockaddr*)&sock.client_addr, &sock.client_addr_size);
+  socklen_t client_addr_size = sizeof(sock.client_addr);
+  sock.client_sock = accept(sock.server_sock, (struct sockaddr*)&sock.client_addr, &client_addr_size);
 
-  pthread_mutex_lock(&sock.mutx);
   sock.client_socks[sock.client_cnt++] = sock.client_sock;
-  pthread_mutex_unlock(&sock.mutx);
 }
 
 void error_handling(char *msg) {
