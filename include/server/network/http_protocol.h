@@ -12,6 +12,7 @@ namespace network {
 template<size_t PacketSize>
 class BasicHTTPProtocol :
   public BasicProtocol<PacketSize, BasicPacketGenerator<StringPacket>> {
+  static constexpr const char* kHTTP_1_1 = "HTTP/1.1";
  public:
   using base = BasicProtocol<PacketSize, BasicPacketGenerator<StringPacket>>;
   using base::packet_size;
@@ -25,6 +26,21 @@ class BasicHTTPProtocol :
       base::error("Request line already exists!. Existing request line will be overwritten");
     }
     request_line_ = request_type + " " + content + " " + http_version_;
+    return *this;
+  }
+
+  BasicHTTPProtocol& response(int status_code, string_type status_text = "") {
+    if (!request_line_.empty()) {
+      base::error("Request line already exists!. Existing request line will be overwritten");
+    }
+    if (http_version_ != kHTTP_1_1) {
+      base::error("Response must be HTTP/1.1! Overriding to HTTP/1.1");
+      http_version_ = kHTTP_1_1;
+    }
+    status_code_ = status_code;
+    status_text_ = status_text;
+
+    request_line_ = http_version_ + " " + std::to_string(status_code) + " " + status_text;
     return *this;
   }
 
@@ -72,7 +88,7 @@ class BasicHTTPProtocol :
   string_type request_line_;
   int status_code_ = -1;
   string_type status_text_;
-  string_type http_version_ = "HTTP/1.1";
+  string_type http_version_ = kHTTP_1_1;
 };
 
 using HTTPProtocol = BasicHTTPProtocol<65535>;
