@@ -181,6 +181,19 @@ class BasicProtocol {
       key_separator_(std::move(key_separator))
   {}
 
+  void add_header(string_type key, string_type value) {
+    if (const auto it = header().find(key); it != header().end()) {
+      error("Key ", it->first, " already exists! Existing key will be overwritten");
+
+      header_.emplace(std::move(key), std::move(value));
+      auto prev_it = std::find(header_sequence_.begin(), header_sequence_.end(), it);
+      std::swap(*prev_it, header_sequence_.back());
+    } else {
+      auto p = header_.emplace(std::move(key), std::move(value));
+      header_sequence_.emplace_back(p.first);
+    }
+  }
+
   template<typename Key, typename Value>
   std::enable_if_t<
     std::conjunction_v<
@@ -189,26 +202,34 @@ class BasicProtocol {
     >
   >
   add_header(Key&& key, Value&& value) {
-//    if (const auto it = std::find(header().begin(), header().end(), header_type::value_type(key, value)); it != header().end()) {
-    if (const auto it = header().find(key); it != header().end()) {
-      error("Key ", it->first, " already exists! Existing key will be overwritten");
-
-      header_.emplace(std::forward<Key>(key), std::forward<Value>(value));
-      auto prev_it = std::find(header_sequence_.begin(), header_sequence_.end(), it);
-      std::swap(*prev_it, header_sequence_.back());
-    } else {
-      auto p = header_.emplace(std::forward<Key>(key), std::forward<Value>(value));
-      header_sequence_.emplace_back(p.first);
-    }
+    add_header(string_type(std::forward<Key>(key)), string_type(std::forward<Value>(value)));
   }
 
-   void set_content(string_type data) {
-     if (!content_.empty()) {
-       error("Content already exists! Existing content will be overwritten.");
-     }
+  template<typename Key, typename Value>
+  std::enable_if_t<
+    std::conjunction_v<
+      std::is_constructible<string_type, Key>,
+      std::is_arithmetic<Value>>>
+  add_header(Key&& key, Value value) {
+    add_header(string_type(std::forward<Key>(key)), std::to_string(value));
+  }
 
-     content_ = std::move(data);
-   }
+  void set_content(string_type data) {
+    if (!content_.empty()) {
+      error("Content already exists! Existing content will be overwritten.");
+    }
+
+    content_ = std::move(data);
+  }
+
+  template<typename T, std::enable_if_t<std::is_constructible_v<T&&, string_type>, int> = 0>
+  void set_content(T&& data) {
+    set_content(std::string(std::forward<T>(data)));
+  }
+
+  void set_content(const char* data, size_t data_size) {
+    set_content(std::string(data, data + data_size));
+  }
 
   NETWORK_NODISCARD const header_type& header() const { return header_; }
 

@@ -93,7 +93,7 @@ int main() {
 
     protocol.add_header("foo", "bar");
     protocol.add_header("name", "yonggyulee");
-    protocol.add_header("ID", "17010370");
+    protocol.add_header("ID", 17010370);
     protocol.set_content("This is content");
 
     auto packet_builder = protocol.build();
