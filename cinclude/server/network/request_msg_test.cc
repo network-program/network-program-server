@@ -42,10 +42,14 @@ void *handle_client(void *arg) {
 	printf("%s\n", buf); // TEST
 
 	network::HTTPProtocol parser;
+	parser.parse(buf);
+
+
   cout << "http version = " << parser.http_version() << '\n';
   cout << "status code = " << parser.status_code() << '\n';
   cout << "status_test = " << parser.status_text() << '\n';
 
+	string response;
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
@@ -61,4 +65,40 @@ void *handle_client(void *arg) {
 	close(client_sock);
 	
 	return NULL;
+}
+
+void send_msg(char *msg, int len) {
+  int i;
+
+  pthread_mutex_lock(&sock.mutx);
+  for(i = 0; i < sock.client_cnt; i++) {
+    write(sock.client_socks[i], msg, len);
+  }
+  pthread_mutex_unlock(&sock.mutx);
+}
+
+void request_post(char* uri) {
+	// uri가 뭔지 파악
+
+	// post의 경우 뭘 하라는 건지 파악하고
+
+	// 성공했다고 response 보내야 함
+}
+
+void request_get(char* uri) {
+	// uri가 뭔지 파악
+
+	// 원하는 것을 파악하고 response로 그것을 줘야함
+
+	// 근데 인코딩해서 줘야함
+	// 어떤걸로 인코딩 했는지도 적어줘야 함
+
+}
+
+string response_get() {
+
+}
+
+string response_post() {
+	
 }
