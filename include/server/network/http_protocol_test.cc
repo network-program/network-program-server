@@ -34,6 +34,7 @@ constexpr const char* kResponse = "HTTP/1.1 403 FORBIDDEN\r\n"
                                   "Server: Apache\r\n"
                                   "Content-Type: text/html; charset=iso-8895-1\r\n"
                                   "Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
+                                  "Content-Length: 67\r\n"
                                   "\r\n"
                                   "<!DOCTYPE HTML PUBLIC \"-//IETF/DTD HTML 2.0//EN\">"
                                   "<h1>FORBIDDEN</h1>";
@@ -47,9 +48,7 @@ int main() {
     http_protocol.request("POST", "/test.jpg");
     http_protocol.add_header("Host", "localhost:8000");
     http_protocol.add_header("User-Agent", "Mozilla/5.0 Chrome/99.99");
-    http_protocol.add_header("Content-Type", "Text");
-    http_protocol.add_header("Content-Length", "15");
-    http_protocol.set_content("Hello, network!");
+    http_protocol.set_content("Hello, network!", "Text");
 
     auto generator = http_protocol.build();
 
@@ -94,13 +93,15 @@ int main() {
     network::HTTPProtocol protocol;
     protocol.response(404, "FORBIDDEN");
     protocol.add_header("header", "value");
-    protocol.set_content("Access denied");
+    protocol.set_content("Access denied", "Text");
     auto generator = protocol.build();
     auto packet = generator.GenerateNext();
-    if (packet; packet->to_string() != "HTTP/1.1 404 FORBIDDEN\r\n"
-                                       "header: value\r\n"
-                                       "\r\n"
-                                       "Access denied") TEST_FAIL;
+    if (packet->to_string() != "HTTP/1.1 404 FORBIDDEN\r\n"
+                               "header: value\r\n"
+                               "Content-Type: Text\r\n"
+                               "Content-Length: 13\r\n"
+                               "\r\n"
+                               "Access denied") TEST_FAIL;
   }
 
   {

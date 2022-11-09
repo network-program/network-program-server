@@ -46,6 +46,14 @@ class BasicHTTPProtocol :
     return *this;
   }
 
+  void set_content(string_type data, string_type content_type = "") {
+    if (!content_type.empty()) {
+      base::add_header("Content-Type", std::move(content_type));
+    }
+    base::add_header("Content-Length", data.size());
+    base::set_content(std::move(data));
+  }
+
   generator build(std::stringstream ss = std::stringstream()) {
     ss << start_line_ << base::key_separator();
     return base::build(std::move(ss));
