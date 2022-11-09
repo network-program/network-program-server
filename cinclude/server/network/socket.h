@@ -56,6 +56,7 @@ void sock_init(int port_number) {
 }
 
 void sock_accept() {
+  sock.client_addr.sin_port = 3000;
   sock.client_addr_size = sizeof(sock.client_addr);
   socklen_t client_addr_size = sizeof(sock.client_addr);
   sock.client_sock = accept(sock.server_sock, (struct sockaddr*)&sock.client_addr, &client_addr_size);
