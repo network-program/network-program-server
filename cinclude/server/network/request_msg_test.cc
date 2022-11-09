@@ -49,7 +49,14 @@ void *handle_client(void *arg) {
   cout << "status code = " << parser.status_code() << '\n';
   cout << "status_test = " << parser.status_text() << '\n';
 
-	string response;
+	string response = 
+			"HTTP/1.1 403 FORBIDDEN\r\n"
+      "Server: Apache\r\n"
+      "Content-Type: text/html; charset=iso-8895-1\r\n"
+      "Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
+      "\r\n";
+
+	send_msg(response);
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
@@ -67,12 +74,12 @@ void *handle_client(void *arg) {
 	return NULL;
 }
 
-void send_msg(char *msg, int len) {
+void send_msg(const std::string& msg) {
   int i;
 
   pthread_mutex_lock(&sock.mutx);
   for(i = 0; i < sock.client_cnt; i++) {
-    write(sock.client_socks[i], msg, len);
+    write(sock.client_socks[i], msg.c_str(), msg.size());
   }
   pthread_mutex_unlock(&sock.mutx);
 }
@@ -90,15 +97,5 @@ void request_get(char* uri) {
 
 	// 원하는 것을 파악하고 response로 그것을 줘야함
 
-	// 근데 인코딩해서 줘야함
-	// 어떤걸로 인코딩 했는지도 적어줘야 함
-
-}
-
-string response_get() {
-
-}
-
-string response_post() {
-	
+	// 근데 json 형식으로 줘야 함
 }
