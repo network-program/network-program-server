@@ -6,12 +6,13 @@
 #include "./socket.h"
 #include "./http_protocol.h"
 #include <iostream>
+#include <string>
 
 using namespace std;
 
 extern struct stat_socket sock;
 
-void send_msg(char *msg, int len);
+void send_msg(const std::string& msg);
 void *handle_client(void *arg);
 
 int main(int argc, char *argv[]) {
@@ -50,11 +51,11 @@ void *handle_client(void *arg) {
   cout << "status_test = " << parser.status_text() << '\n';
 
 	string response = 
-			"HTTP/1.1 403 FORBIDDEN\r\n"
+			"HTTP/1.1 200 OK\r\n"
       "Server: Apache\r\n"
-      "Content-Type: text/html; charset=iso-8895-1\r\n"
       "Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
-      "\r\n";
+      "\r\n"
+      "{\"name\":\"이범석\",\"chat\":\"응안녕못해\"}";
 
 	send_msg(response);
 
