@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -212,6 +213,13 @@ class BasicProtocol {
       std::is_arithmetic<Value>>>
   add_header(Key&& key, Value value) {
     add_header(string_type(std::forward<Key>(key)), std::to_string(value));
+  }
+
+  void add_datetime() {
+    const auto t = std::time(nullptr);
+    std::string buf(100, '\0');
+    std::strftime(buf.data(), buf.size(), "%c", std::localtime(&t));
+    add_header("Date", std::move(buf));
   }
 
   void set_content(string_type data) {

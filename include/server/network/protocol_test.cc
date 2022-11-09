@@ -152,5 +152,15 @@ int main() {
     if (const auto p = builder.GenerateNext(); p.has_value()) TEST_FAIL;
   }
 
+  {
+    Protocol protocol(": ", "\r\n");
+    protocol.add_datetime();
+
+    auto builder = protocol.build();
+    auto p = builder.GenerateNext();
+    if (p->content().size() < 10) TEST_FAIL;
+    std::cout << p->content();
+  }
+
   return EXIT_SUCCESS;
 }
