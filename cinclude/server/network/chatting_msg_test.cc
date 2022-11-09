@@ -39,6 +39,7 @@ void *handle_client(void *client) {
     if(str_len == -1)
       perror("state code 500");
     
+		cout << buf << "\n";
     send_msg(buf, str_len);
   }
 
