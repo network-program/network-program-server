@@ -3,10 +3,22 @@
  * Created by Yi BeomSeok
 */
 
-#include "./socket.h"
-#include "./http_protocol.h"
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+
 #include <iostream>
 #include <string>
+#include <unordered_map>
+#include <utility>
+#include <map>
+#include <chrono>
+
+#include "socket.h"
+
+#include "server/network/http_protocol.h"
+
+#include "json/json.h"
 
 using namespace std;
 
@@ -15,8 +27,20 @@ extern struct stat_socket sock;
 void send_msg(const std::string& msg);
 void *handle_client(void *arg);
 
+void signal_handler(int sig) {
+	std::cout << "Signal " << sig << '\n';
+	// if (sig != EXIT_SUCCESS) {
+		close(sock.server_sock);
+		exit(0);
+	// }
+}
+
+std::map<unsigned long long, std::pair<std::string, std::string>> message_history;
+
 int main(int argc, char *argv[]) {
   sock_init(atoi(argv[1]));
+
+	signal(SIGINT, signal_handler);
 	
   while (1)
   {
@@ -27,37 +51,70 @@ int main(int argc, char *argv[]) {
 		printf("Connected client IP: %s \n", inet_ntoa(sock.client_addr.sin_addr));
 	}
   
+
 	close(sock.server_sock);
 
 	return 0;
 }
 
+using key_value = std::unordered_map<std::string, std::string>;
+
+key_value ParseJson(const std::string& data) {
+
+}
+
 void *handle_client(void *arg) {
+	std::cout << __func__ << '\n';
 	int client_sock = *((int*)arg);
 	int str_len = 0, i;
-	char buf[BUFSIZ];
+	char buf[100'000] = {};
   
-	if(read(client_sock, buf, BUFSIZ) < 0) {
-    perror("state code 500");
-  }
-	printf("%s\n", buf); // TEST
+	if(read(client_sock, buf, 100'000) < 0) {
+    perror("state code 500\n");
+  } else {
+		do {
+			printf("HTTP Request:\n%s\n", buf); // TEST
 
-	network::HTTPProtocol parser;
-	parser.parse(buf);
+			network::HTTPProtocol parser;
+			const auto b = parser.parse(buf);
+			if (!b) {
+				std::cerr << "Failed to parse HTTP request!\n";
+				break;
+			}
 
+			Json::Value root;
+			Json::Reader reader;
+			const auto success = reader.parse(parser.content(), root);
+			if (!success) {
+				std::cerr << "Failed to parse!\n";
+				break;
+			}
 
-  cout << "http version = " << parser.http_version() << '\n';
-  cout << "status code = " << parser.status_code() << '\n';
-  cout << "status_test = " << parser.status_text() << '\n';
+			const auto now = std::chrono::system_clock::now();
+			const auto t = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 
-	string response = 
-			"HTTP/1.1 200 OK\r\n"
-      "Server: Apache\r\n"
-      "Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
-      "\r\n"
-      "{\"name\":\"이범석\",\"chat\":\"응안녕못해\"}";
+			const auto name = root["name"].asString();
+			const auto chat = root["chat"].asString();
 
-	send_msg(response);
+			std::cout << "name: " << name << '\n';
+			std::cout << "chat: " << chat << '\n';
+
+			message_history.emplace(t, std::make_pair(name, chat));
+
+			std::cout << "Content: " << parser.content() << '\n';
+
+			string response = 
+					"HTTP/1.1 200 OK\r\n"
+					"Server: Apache\r\n"
+					"Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
+					"\r\n"
+					"[{\"name\":\"이범석\",\"chat\":\"응안녕못해\"},"
+					 "{\"name\":\"이용규\",\"chat\":\"난너가싫어\"}]";
+			std::cout << "\n\nSending Response:\n\n" << response << '\n';
+
+			send_msg(response);
+		} while (false);
+	}
 
 	pthread_mutex_lock(&sock.mutx);
 	for(i = 0; i < sock.client_cnt; i++) {
