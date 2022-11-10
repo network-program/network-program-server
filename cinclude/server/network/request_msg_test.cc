@@ -24,7 +24,7 @@ using namespace std;
 
 extern struct stat_socket sock;
 
-void send_msg(const std::string& msg);
+void send_msg(const std::string& msg, int client);
 void *handle_client(void *arg);
 
 void signal_handler(int sig) {
@@ -41,6 +41,12 @@ int main(int argc, char *argv[]) {
   sock_init(atoi(argv[1]));
 
 	signal(SIGINT, signal_handler);
+
+	message_history.emplace(10, std::make_pair("James", "Hi"));
+	message_history.emplace(20, std::make_pair("Nana", "Fuckyou"));
+
+	// int x = 1;
+	// handle_client(&x);
 	
   while (1)
   {
@@ -67,13 +73,20 @@ void *handle_client(void *arg) {
 	std::cout << __func__ << '\n';
 	int client_sock = *((int*)arg);
 	int str_len = 0, i;
-	char buf[100'000] = {};
+	std::string buf(100'000, '\0');
+	// buf = "POST /user HTTP/1.1\r\n"
+	// 			"\r\n"
+	// 			"{\"name\": \"이민호\", \"chat\": \"안녕하세요\"}";
+	// buf = "GET / HTTP/1.1\r\n"
+				// "From-Time: 3\r\n"
+				// "\r\n";
   
-	if(read(client_sock, buf, 100'000) < 0) {
+	if(read(client_sock, buf.data(), buf.size()) < 0) {
+	// if (false) {
     perror("state code 500\n");
   } else {
 		do {
-			printf("HTTP Request:\n%s\n", buf); // TEST
+			printf("HTTP Request:\n%s\n", buf.data()); // TEST
 
 			network::HTTPProtocol parser;
 			const auto b = parser.parse(buf);
@@ -82,37 +95,76 @@ void *handle_client(void *arg) {
 				break;
 			}
 
-			Json::Value root;
-			Json::Reader reader;
-			const auto success = reader.parse(parser.content(), root);
-			if (!success) {
-				std::cerr << "Failed to parse!\n";
-				break;
-			}
+			std::cout << "Request type: " << parser.http_method() << '\n';
 
-			const auto now = std::chrono::system_clock::now();
-			const auto t = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+			if (const auto& method = parser.http_method(); method == "POST") {
+				std::cout << "Content: " << parser.content() << '\n';
+				Json::Value root;
+				Json::Reader reader;
+				const auto success = reader.parse(parser.content(), root);
+				if (!success) {
+					std::cerr << "Failed to parse!\n";
+					break;
+				}
 
-			const auto name = root["name"].asString();
-			const auto chat = root["chat"].asString();
+				const auto now = std::chrono::system_clock::now();
+				const auto t = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 
-			std::cout << "name: " << name << '\n';
-			std::cout << "chat: " << chat << '\n';
+				const auto name = root["name"].asString();
+				const auto chat = root["chat"].asString();
 
-			message_history.emplace(t, std::make_pair(name, chat));
+				std::cout << "name: " << name << '\n';
+				std::cout << "chat: " << chat << '\n';
 
-			std::cout << "Content: " << parser.content() << '\n';
+				message_history.emplace(t, std::make_pair(name, chat));
 
-			string response = 
+				string response = 
+						"HTTP/1.1 200 OK\r\n"
+						"\r\n";
+				send_msg(response, client_sock);
+			} else if (method == "GET") {
+    		const auto& header = parser.header();
+
+				const auto it = header.find("From-Time");
+				if (it == header.end()) {
+					std::cerr << "Header " << "From-Time" << " Not found!\n";
+
+
+					std::string res = 
 					"HTTP/1.1 200 OK\r\n"
 					"Server: Apache\r\n"
 					"Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
 					"\r\n"
-					"[{\"name\":\"이범석\",\"chat\":\"응안녕못해\"},"
-					 "{\"name\":\"이용규\",\"chat\":\"난너가싫어\"}]";
-			std::cout << "\n\nSending Response:\n\n" << response << '\n';
+					"[{\"name\":\"이범석\", \"chat\":\"안녕못해요\"}]";
+					send_msg(res, client_sock);
+				} else {
+					const auto t = std::stoi(it->second);
 
-			send_msg(response);
+					auto lb = message_history.lower_bound(t);
+
+					std::string res = 
+					"HTTP/1.1 200 OK\r\n"
+					"Server: Apache\r\n"
+					"Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
+					"\r\n"
+					"[";
+
+					if (lb != message_history.end()) {
+						res += "{\"name\":\"" + lb->second.first + "\",\"chat\":\"" + lb->second.second + "\"}";
+					}
+					++lb;
+
+					while (lb != message_history.end()) {
+						res += ",{\"name\":\"" + lb->second.first + "\",\"chat\":\"" + lb->second.second + "\"}";
+						++lb;
+					}
+					
+					res += "]";
+
+					send_msg(res, client_sock);
+				}
+			}
+
 		} while (false);
 	}
 
@@ -132,28 +184,14 @@ void *handle_client(void *arg) {
 	return NULL;
 }
 
-void send_msg(const std::string& msg) {
+void send_msg(const std::string& msg, int client_sock) {
+	std::cout << "Sending Response to " << client_sock << ": \n";
+	std::cout << msg << "\n\n";
   int i;
 
   pthread_mutex_lock(&sock.mutx);
-  for(i = 0; i < sock.client_cnt; i++) {
-    write(sock.client_socks[i], msg.c_str(), msg.size());
-  }
+  // for(i = 0; i < sock.client_cnt; i++) {
+    write(client_sock, msg.c_str(), msg.size());
+  // }
   pthread_mutex_unlock(&sock.mutx);
-}
-
-void request_post(char* uri) {
-	// uri가 뭔지 파악
-
-	// post의 경우 뭘 하라는 건지 파악하고
-
-	// 성공했다고 response 보내야 함
-}
-
-void request_get(char* uri) {
-	// uri가 뭔지 파악
-
-	// 원하는 것을 파악하고 response로 그것을 줘야함
-
-	// 근데 json 형식으로 줘야 함
 }

@@ -1,0 +1,14 @@
+/home/ubuntu/network-program-server/build2/CMakeFiles/rebuild_cache.dir
+/home/ubuntu/network-program-server/build2/CMakeFiles/edit_cache.dir
+/home/ubuntu/network-program-server/build2/CMakeFiles/test.dir
+/home/ubuntu/network-program-server/build2/CMakeFiles/chat_server.dir
+/home/ubuntu/network-program-server/build2/CMakeFiles/network_server.dir
+/home/ubuntu/network-program-server/build2/third_party/jsoncpp/CMakeFiles/edit_cache.dir
+/home/ubuntu/network-program-server/build2/third_party/jsoncpp/CMakeFiles/test.dir
+/home/ubuntu/network-program-server/build2/third_party/jsoncpp/CMakeFiles/rebuild_cache.dir
+/home/ubuntu/network-program-server/build2/third_party/jsoncpp/CMakeFiles/jsoncpp.dir
+/home/ubuntu/network-program-server/build2/include/server/network/CMakeFiles/rebuild_cache.dir
+/home/ubuntu/network-program-server/build2/include/server/network/CMakeFiles/edit_cache.dir
+/home/ubuntu/network-program-server/build2/include/server/network/CMakeFiles/test.dir
+/home/ubuntu/network-program-server/build2/include/server/network/CMakeFiles/http_protocol_test.dir
+/home/ubuntu/network-program-server/build2/include/server/network/CMakeFiles/protocol_test.dir
