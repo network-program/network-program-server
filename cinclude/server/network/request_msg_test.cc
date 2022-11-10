@@ -124,21 +124,24 @@ void *handle_client(void *arg) {
 				send_msg(response, client_sock);
 			} else if (method == "GET") {
     		const auto& header = parser.header();
-
-				const auto it = header.find("From-Time");
+				const auto it = header.find("from_time");
 				if (it == header.end()) {
-					std::cerr << "Header " << "From-Time" << " Not found!\n";
-
+					std::cerr << "Header " << "from_time" << " Not found!\n";
 
 					std::string res = 
 					"HTTP/1.1 200 OK\r\n"
 					"Server: Apache\r\n"
 					"Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
-					"\r\n"
-					"[{\"name\":\"이범석\", \"chat\":\"안녕못해요\"}]";
+					"\r\n";
+					// "["
+						// "{\"name\":\"이범석\", \"chatKey\":\"안녕못해요\"},"
+						// "{\"name\":\"이민호\", \"chatKey\":\"나도안녕못해\"},"
+						// "{\"name\":\"이용규\", \"chatKey\":\"나도마찬가지\"}"
+					// "]";
 					send_msg(res, client_sock);
 				} else {
-					const auto t = std::stoi(it->second);
+					std::cout << "from_time: " << it->second << '\n';
+					const auto t = std::stoll(it->second);
 
 					auto lb = message_history.lower_bound(t);
 
@@ -150,12 +153,12 @@ void *handle_client(void *arg) {
 					"[";
 
 					if (lb != message_history.end()) {
-						res += "{\"name\":\"" + lb->second.first + "\",\"chat\":\"" + lb->second.second + "\"}";
+						res += "{\"name\":\"" + lb->second.first + "\",\"chatKey\":\"" + lb->second.second + "\"}";
 					}
 					++lb;
 
 					while (lb != message_history.end()) {
-						res += ",{\"name\":\"" + lb->second.first + "\",\"chat\":\"" + lb->second.second + "\"}";
+						res += ",{\"name\":\"" + lb->second.first + "\",\"chatKey\":\"" + lb->second.second + "\"}";
 						++lb;
 					}
 					
