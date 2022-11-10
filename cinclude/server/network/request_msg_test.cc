@@ -13,6 +13,7 @@
 #include <utility>
 #include <map>
 #include <chrono>
+#include <mutex>
 
 #include "socket.h"
 
@@ -36,6 +37,7 @@ void signal_handler(int sig) {
 }
 
 std::map<unsigned long long, std::pair<std::string, std::string>> message_history;
+std::mutex history_m;
 
 int main(int argc, char *argv[]) {
   sock_init(atoi(argv[1]));
@@ -115,8 +117,11 @@ void *handle_client(void *arg) {
 
 				std::cout << "name: " << name << '\n';
 				std::cout << "chat: " << chat << '\n';
-
-				message_history.emplace(t, std::make_pair(name, chat));
+				
+				{
+					std::lock_guard lck(history_m);
+					message_history.emplace(t, std::make_pair(name, chat));
+				}
 
 				string response = 
 						"HTTP/1.1 200 OK\r\n"
@@ -143,6 +148,7 @@ void *handle_client(void *arg) {
 					std::cout << "from_time: " << it->second << '\n';
 					const auto t = std::stoll(it->second);
 
+					std::unique_lock lck(history_m);
 					auto lb = message_history.lower_bound(t);
 
 					std::string res = 
@@ -161,6 +167,7 @@ void *handle_client(void *arg) {
 						res += ",{\"name\":\"" + lb->second.first + "\",\"chatKey\":\"" + lb->second.second + "\"}";
 						++lb;
 					}
+					lck.unlock();
 					
 					res += "]";
 
