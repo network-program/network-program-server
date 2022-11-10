@@ -58,7 +58,7 @@ void sock_init(int port_number) {
 }
 
 void sock_accept() {
-  sock.client_addr.sin_addr.s_addr = inet_addr("3.35.86.156");
+  sock.client_addr.sin_addr.s_addr = inet_addr("3.37.112.35");
   sock.client_addr.sin_port = 3000;
   sock.client_addr_size = sizeof(sock.client_addr);
   socklen_t client_addr_size = sizeof(sock.client_addr);
