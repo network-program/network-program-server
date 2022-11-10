@@ -12,7 +12,6 @@
 #include <string>
 #include <chrono>
 #include "include/server/network/http_protocol.h"
-
 #define PACKET_SIZE 65535
 
 class HttpServerSocket {
@@ -37,7 +36,7 @@ private:
 
 	void bind_socket() {
 		// 소켓 binding
-		if (bind(listen_socket, (struct sockaddr*)&server_addr, sizeof(s                                                                                                             erver_addr)) < 0)
+		if (bind(listen_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0)
 			errquit("bind fail");
 	}
 
@@ -62,7 +61,7 @@ public:
 	void connect_client() {
 		// 클라이언트의 연결요청을 accept 함
 		int addrlen = sizeof(client_addr);
-		accept_socket = accept(listen_socket, (struct sockaddr*)&client_                                                                                                             addr, (socklen_t*)&addrlen);
+		accept_socket = accept(listen_socket, (struct sockaddr*)&client_addr, (socklen_t*)&addrlen);
 	}
 
 	void close_accpet_socket() {
@@ -119,26 +118,26 @@ int main(int argc, char* argv[]) {
 		std::cout << "[Success]" << request << "\n";
 
 		// Response 패킷을 만듬
-		// 어떤식으로 Response 패킷을 만들지에 대한 로직이 필요. 아래는                                                                                                              임시 로직임
+		// 어떤식으로 Response 패킷을 만들지에 대한 로직이 필요. 아래는 임시 로직임
 		network::HTTPProtocol protocol;
 		if (http_method == "GET") {
 			auto now = std::chrono::system_clock::now();
-			std::time_t end_time = std::chrono::system_clock::to_tim                                                                                                             e_t(now);
-			std::string temp_content = "{\"name\":\"test\", \"value\                                                                                                             ":\"GET response data\"}";
+			std::time_t end_time = std::chrono::system_clock::to_time_t(now);
+			std::string temp_content = "{\"name\":\"test\", \"value\":\"GET response data\"}";
 			protocol.response(200, "OK");
 			protocol.add_header("Date", std::ctime(&end_time));
-			protocol.add_header("Content-Length", std::to_string(tem                                                                                                             p_content.length()));
-			protocol.add_header("Content-Type", "text/html; charset=                                                                                                             UTF-8");
+			protocol.add_header("Content-Length", std::to_string(temp_content.length()));
+			protocol.add_header("Content-Type", "text/html; charset=UTF-8");
 			protocol.set_content(temp_content);
 		}
 		else { // POST나 그 외의 방식일 경우
 			auto now = std::chrono::system_clock::now();
-			std::time_t end_time = std::chrono::system_clock::to_tim                                                                                                             e_t(now);
-			std::string temp_content = "{\"name\":\"test\", \"value\                                                                                                             ":\"POST response data\"}";
+			std::time_t end_time = std::chrono::system_clock::to_time_t(now);
+			std::string temp_content = "{\"name\":\"test\", \"value\":\"POST response data\"}";
 			protocol.response(200, "OK");
 			protocol.add_header("Date", std::ctime(&end_time));
-			protocol.add_header("Content-Length", std::to_string(tem                                                                                                             p_content.length()));
-			protocol.add_header("Content-Type", "text/html; charset=                                                                                                             UTF-8");
+			protocol.add_header("Content-Length", std::to_string(temp_content.length()));
+			protocol.add_header("Content-Type", "text/html; charset=UTF-8");
 			protocol.set_content(temp_content);
 		}
 
