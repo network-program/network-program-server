@@ -10,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <chrono>
 #include "include/server/network/http_protocol.h"
 
 #define PACKET_SIZE 65535
@@ -18,7 +19,7 @@ class HttpServerSocket {
 private:
 	int listen_socket, accept_socket;
 	struct sockaddr_in client_addr, server_addr;
-	char *packet_buffer;
+	char* packet_buffer;
 
 	void errquit(char* mesg) { perror(mesg); exit(0); }
 
@@ -40,31 +41,37 @@ private:
 			errquit("bind fail");
 	}
 
-public:
-	HttpServerSocket() {
-		this->packet_buffer = new char[PACKET_SIZE];
-	}
-
-	void open_socket(int host, int port) {
-		create_socket(host, port);
-		bind_socket();
-	}
-
 	void wait_client(int backlog) {
 		// 클라이언트로부터 연결요청을 기다림
 		listen(listen_socket, backlog);
 		if (listen_socket == -1)
 			errquit("tcp_listen fail");
+	}
 
+public:
+	HttpServerSocket() {
+		this->packet_buffer = new char[PACKET_SIZE];
+	}
+
+	void open_socket(int host, int port, int backlog) {
+		create_socket(host, port);
+		bind_socket();
+		wait_client(backlog);
+	}
+
+	void connect_client() {
 		// 클라이언트의 연결요청을 accept 함
 		int addrlen = sizeof(client_addr);
 		accept_socket = accept(listen_socket, (struct sockaddr*)&client_                                                                                                             addr, (socklen_t*)&addrlen);
 	}
 
-	void close_socket() {
+	void close_accpet_socket() {
+		close(accept_socket);
+	}
+
+	void close_listen_socket() {
 		delete packet_buffer;
 		close(listen_socket);
-		close(accept_socket);
 	}
 
 	std::string recv_packet() { // 패킷 수신
@@ -73,12 +80,12 @@ public:
 		return packet_str;
 	}
 
-	void send_packet(char *packet) { // 패킷 전송
-		send(this->accept_socket, packet, PACKET_SIZE, 0);
+	void send_packet(char* packet) { // 패킷 전송
+		send(this->accept_socket, packet, std::string(packet).length() + 1, 0);
 	}
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
 
 	// 올바른 입력이 아닐 때에 대한 처리
 	if (argc != 2) {
@@ -86,42 +93,70 @@ int main(int argc, char *argv[]) {
 		exit(0);
 	}
 
-	// 소켓 생성 및 클라이언트와 연결
-	HttpServerSocket *http_socket = new HttpServerSocket();
-	http_socket->open_socket(INADDR_ANY, atoi(argv[1]));
+	// 소켓 생성 및 클라이언트의 연결 대기
+	HttpServerSocket* http_socket = new HttpServerSocket();
+	http_socket->open_socket(INADDR_ANY, atoi(argv[1]), 5);
 
 	while (1) {
-		// 클라이언트의 연결을 기다림
-		http_socket->wait_client(5);
+		// 클라이언트와 연결
+		http_socket->connect_client();
 
 		// Request 패킷을 받음
 		std::string request = http_socket->recv_packet();
 
-		// GET, POST 방식 조회
-		if (request.rfind("GET", 0) == 0)
-			std::cout << "GET 방식 입니다.\n";
-		else if (request.rfind("POST", 0) == 0)
-			std::cout << "POST 방식 입니다.\n";
-		else
-			std::cout << "GET 또는 POST 방식이 아닙니다.\n";
+		// 받은 Request 패킷을 분석함
+		network::HTTPProtocol parser;
+		if (!parser.parse(request)) {
+			std::cout << "[Error]Request parsing failed.\n";
+			http_socket->close_accpet_socket();
+			continue;
+		}
+		std::string http_method = parser.http_method();
+		std::string request_target = parser.request_target();
+		std::string http_version = parser.http_version();
+		std::string content = parser.content();
 
-		// Request 패킷 출력헤보기
-		std::cout << request << "\n";
+		std::cout << "[Success]" << request << "\n";
 
-		// Response 패킷을 만들고 클라이언트로 전송
-		// 버그로 인해 임시 주석 처리
-		/*char *response =
-				"HTTP/1.1 403 FORBIDDEN\r\n"
-				"Server: Apache\r\n"
-				"Content-Type: text/html; charset=iso-8895-1\r\n"
-				"Date: Sun, 6 Nov 2022 20:54:51 GMT\r\n"
-				"\r\n"
-				"<!DOCTYPE HTML PUBLIC \"-//IETF/DTD HTML 2.0//EN\">"
-				"<h1>FORBIDDEN</h1>";
-		http_socket->send_packet(response);*/
+		// Response 패킷을 만듬
+		// 어떤식으로 Response 패킷을 만들지에 대한 로직이 필요. 아래는                                                                                                              임시 로직임
+		network::HTTPProtocol protocol;
+		if (http_method == "GET") {
+			auto now = std::chrono::system_clock::now();
+			std::time_t end_time = std::chrono::system_clock::to_tim                                                                                                             e_t(now);
+			std::string temp_content = "{\"name\":\"test\", \"value\                                                                                                             ":\"GET response data\"}";
+			protocol.response(200, "OK");
+			protocol.add_header("Date", std::ctime(&end_time));
+			protocol.add_header("Content-Length", std::to_string(tem                                                                                                             p_content.length()));
+			protocol.add_header("Content-Type", "text/html; charset=                                                                                                             UTF-8");
+			protocol.set_content(temp_content);
+		}
+		else { // POST나 그 외의 방식일 경우
+			auto now = std::chrono::system_clock::now();
+			std::time_t end_time = std::chrono::system_clock::to_tim                                                                                                             e_t(now);
+			std::string temp_content = "{\"name\":\"test\", \"value\                                                                                                             ":\"POST response data\"}";
+			protocol.response(200, "OK");
+			protocol.add_header("Date", std::ctime(&end_time));
+			protocol.add_header("Content-Length", std::to_string(tem                                                                                                             p_content.length()));
+			protocol.add_header("Content-Type", "text/html; charset=                                                                                                             UTF-8");
+			protocol.set_content(temp_content);
+		}
+
+		// Response 패킷을 char* 형태로 변환
+		auto generator = protocol.build();
+		auto packet = generator.GenerateNext()->to_string();
+		std::vector<char> writable(packet.begin(), packet.end());
+		writable.push_back('\0');
+		char* response_packet = &writable[0];
+
+		// 만든 Response 패킷을 클라이언트로 전송
+		http_socket->send_packet(response_packet);
+
+		// 클라이언트와 연결되어있는 소켓 닫음
+		http_socket->close_accpet_socket();
 	}
-	// 소켓 닫음
-	http_socket->close_socket();
+	// 클라이언트의 연결을 기다리고 있는 소켓 닫음
+	http_socket->close_listen_socket();
 
 	// 메모리 해제 및 종료
 	delete http_socket;
