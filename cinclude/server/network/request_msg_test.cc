@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 	signal(SIGINT, signal_handler);
 
 	message_history.emplace(10, std::make_pair("James", "Hi"));
-	message_history.emplace(20, std::make_pair("Nana", "Fuckyou"));
+	message_history.emplace(20, std::make_pair("Nana", "Hi to you too"));
 
 	// int x = 1;
 	// handle_client(&x);
@@ -63,12 +63,6 @@ int main(int argc, char *argv[]) {
 	close(sock.server_sock);
 
 	return 0;
-}
-
-using key_value = std::unordered_map<std::string, std::string>;
-
-key_value ParseJson(const std::string& data) {
-
 }
 
 void *handle_client(void *arg) {
