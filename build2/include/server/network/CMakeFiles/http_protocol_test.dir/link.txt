@@ -1,1 +1,0 @@
-/usr/bin/c++     CMakeFiles/http_protocol_test.dir/http_protocol_test.cc.o  -o http_protocol_test 

@@ -2,7 +2,7 @@
 // Created by YongGyu Lee on 2022/10/14.
 //
 
-#include "server/network/protocol.h"
+#include "server/protocol/protocol.h"
 
 #include <iostream>
 #include <exception>

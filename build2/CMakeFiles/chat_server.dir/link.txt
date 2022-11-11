@@ -1,1 +1,0 @@
-/usr/bin/c++     CMakeFiles/chat_server.dir/cinclude/server/network/request_msg_test.cc.o  -o chat_server  third_party/jsoncpp/libjsoncpp.a -lpthread 

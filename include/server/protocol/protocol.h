@@ -23,7 +23,7 @@
 #if __cplusplus >= 201703L
 #define NETWORK_NODISCARD [[nodiscard]]
 #else
-#define COMMON_NODISCARD
+#define NETWORK_NODISCARD
 #endif
 
 #define NETWORK_ASSERT(expr, msg) \

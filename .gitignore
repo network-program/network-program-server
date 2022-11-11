@@ -2,5 +2,7 @@
 ._.DS_store
 build
 
+.vscode
+
 cmake-build-*
 .idea

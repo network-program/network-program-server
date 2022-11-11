@@ -5,7 +5,7 @@
 #ifndef SERVER_NETWORK_HTTP_PROTOCOL_H_
 #define SERVER_NETWORK_HTTP_PROTOCOL_H_
 
-#include "server/network/protocol.h"
+#include "server/protocol/protocol.h"
 
 namespace network {
 
