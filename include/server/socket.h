@@ -15,6 +15,8 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
+#include <iostream>
+
 #define WEBSERVER_PORT 3000
 
 struct stat_socket{
@@ -57,9 +59,11 @@ void sock_init(int port_number) {
     error_handling("listen error");
 }
 
-void sock_accept() {
-  sock.client_addr.sin_addr.s_addr = inet_addr("3.35.86.156");
-  sock.client_addr.sin_port = 3000;
+void sock_accept(const char* ip_address, int port) {
+  std::cout << "Accept socket " << ip_address << ":" << port << '\n';
+
+  sock.client_addr.sin_addr.s_addr = inet_addr(ip_address);
+  sock.client_addr.sin_port = port;
   sock.client_addr_size = sizeof(sock.client_addr);
   socklen_t client_addr_size = sizeof(sock.client_addr);
   sock.client_sock = accept(sock.server_sock, (struct sockaddr*)&sock.client_addr, &client_addr_size);

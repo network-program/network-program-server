@@ -8,7 +8,11 @@ cmake --build build
 
 # Run
 ```
-./build/network_server
+./build/chat_server [port] [webserver_port] [ip_address]
 ```
-or
-`gcc server.c -D_REENTRANT -o server -lpthread`
+
+# Run test
+```
+cd build
+ctest . --extra_verbose --output_on_failure
+```

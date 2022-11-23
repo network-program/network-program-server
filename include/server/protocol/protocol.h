@@ -23,7 +23,7 @@
 #if __cplusplus >= 201703L
 #define NETWORK_NODISCARD [[nodiscard]]
 #else
-#define COMMON_NODISCARD
+#define NETWORK_NODISCARD
 #endif
 
 #define NETWORK_ASSERT(expr, msg) \
@@ -181,6 +181,19 @@ class BasicProtocol {
       key_separator_(std::move(key_separator))
   {}
 
+  void add_header(string_type key, string_type value) {
+    if (const auto it = header().find(key); it != header().end()) {
+      error("Key ", it->first, " already exists! Existing key will be overwritten");
+
+      header_.emplace(std::move(key), std::move(value));
+      auto prev_it = std::find(header_sequence_.begin(), header_sequence_.end(), it);
+      std::swap(*prev_it, header_sequence_.back());
+    } else {
+      auto p = header_.emplace(std::move(key), std::move(value));
+      header_sequence_.emplace_back(p.first);
+    }
+  }
+
   template<typename Key, typename Value>
   std::enable_if_t<
     std::conjunction_v<
@@ -189,29 +202,34 @@ class BasicProtocol {
     >
   >
   add_header(Key&& key, Value&& value) {
-//    if (const auto it = std::find(header().begin(), header().end(), header_type::value_type(key, value)); it != header().end()) {
-    if (const auto it = header().find(key); it != header().end()) {
-      std::stringstream ss;
-      ss << "Key " << it->first << " already exists!"
-         << " Existing key will be overwritten\n";
-      error(ss.str());
-
-      header_.emplace(std::forward<Key>(key), std::forward<Value>(value));
-      auto prev_it = std::find(header_sequence_.begin(), header_sequence_.end(), it);
-      std::swap(*prev_it, header_sequence_.back());
-    } else {
-      auto p = header_.emplace(std::forward<Key>(key), std::forward<Value>(value));
-      header_sequence_.emplace_back(p.first);
-    }
+    add_header(string_type(std::forward<Key>(key)), string_type(std::forward<Value>(value)));
   }
 
-   void set_content(string_type data) {
-     if (!content_.empty()) {
-       error("Content already exists! Existing content will be overwritten.\n");
-     }
+  template<typename Key, typename Value>
+  std::enable_if_t<
+    std::conjunction_v<
+      std::is_constructible<string_type, Key>,
+      std::is_arithmetic<Value>>>
+  add_header(Key&& key, Value value) {
+    add_header(string_type(std::forward<Key>(key)), std::to_string(value));
+  }
 
-     content_ = std::move(data);
-   }
+  void set_content(string_type data) {
+    if (!content_.empty()) {
+      error("Content already exists! Existing content will be overwritten.");
+    }
+
+    content_ = std::move(data);
+  }
+
+  template<typename T, std::enable_if_t<std::is_constructible_v<T&&, string_type>, int> = 0>
+  void set_content(T&& data) {
+    set_content(std::string(std::forward<T>(data)));
+  }
+
+  void set_content(const char* data, size_t data_size) {
+    set_content(std::string(data, data + data_size));
+  }
 
   NETWORK_NODISCARD const header_type& header() const { return header_; }
 
@@ -230,11 +248,15 @@ class BasicProtocol {
     return generator(packet_size, ss.str());
   }
 
-  virtual void parse(const string_type& str) {
+  virtual bool parse(const string_type& str) {
     if (!header_.empty())
       error("Header already exists! Existing values will be overwritten");
     if (!content_.empty())
       error("Content already exists! Existing values will be overwritten");
+    if (str.empty()) {
+      error("Invalid HTTP format!");
+      return false;
+    }
     clear();
 
     string_type::size_type pos_begin = 0;
@@ -248,12 +270,15 @@ class BasicProtocol {
 
       // Header
       const auto sep_pos = str.find(key_value_separator_, pos_begin);
+      if (sep_pos == string_type::npos)
+        return false;
       std::string key(str.begin() + pos_begin, str.begin() + sep_pos);
       std::string value(str.begin() + sep_pos + key_value_separator_.size(), str.begin() + pos_end);
       add_header(std::move(key), std::move(value));
       pos_begin = pos_end + key_separator_.size();
     }
     set_content(str.substr(std::min(pos_end + key_separator_.size(), str.size())));
+    return true;
   }
 
   void clear() {
@@ -270,8 +295,14 @@ class BasicProtocol {
   NETWORK_NODISCARD const string_type& key_value_separator() const { return key_value_separator_; }
 
  protected:
-  void error(const std::string& message) {
-    std::cerr << message;
+  template<typename ...Args>
+  static void error(const Args&... args) {
+    ((std::cerr << "BasicProtocol: ") << ... << args) << '\n';
+  }
+
+  template<typename ...Args>
+  static void log(const Args&... args) {
+    ((std::clog << "BasicProtocol: ") << ... << args) << '\n';
   }
 
  private:

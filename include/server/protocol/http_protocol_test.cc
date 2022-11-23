@@ -2,7 +2,7 @@
 // Created by YongGyu Lee on 2022/10/14.
 //
 
-#include "server/network/http_protocol.h"
+#include "server/protocol/http_protocol.h"
 
 #include <iostream>
 
